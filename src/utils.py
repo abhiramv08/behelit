@@ -98,3 +98,16 @@ def initUploadThread(self):
         except:
             break
     logging.debug("Stopped uploads")
+
+# Class for vector clock. Has functiosn to add client index, check if dependency is met, update timestamp
+class VectorClock():
+    def __init__(self):
+        self.clk = dict()
+    def AddClient(self,key):
+        self.clk[key] = 0
+    def DependencyCheck(self,key,msgTimestamp):
+        if self.clk[key]+1 == msgTimestamp:
+            return True
+        return False
+    def UpdateTimestamp(self,key,msgTimestamp):
+        self.clk[key] = msgTimestamp if msgTimestamp>self.clk[key] else self.clk[key]+1 # need to verify
