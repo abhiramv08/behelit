@@ -7,6 +7,7 @@ import pickle
 import logging
 import sys
 import socket
+import threading
 
 logging.basicConfig(level=logging.INFO)
 
@@ -26,10 +27,6 @@ class ReqStatus(Enum):
     SUCCESS = 0
     FAILURE = 1
 
-# Generates and returns hash using SHA1
-def getHash(chunk):
-    return hashlib.sha1(chunk).hexdigest() 
-
 # Serializer for the bytes to be sent over the network
 def serialize(obj): #Input object, return bytes
     return codecs.encode(pickle.dumps(obj), "base64")
@@ -40,8 +37,9 @@ def deserialize(serText): #Input bytes, return object
 
 # Class for request with request type and list of arguments
 class Request():
-    def __init__(self,reqType,args):
+    def __init__(self,reqType,clock,args):
         self.RequestType = reqType
+        self.Clock = clock
         self.Args = args
 
 # Class for response with status and a body
@@ -67,7 +65,7 @@ def sendReqSocket(self, request:Request, serverName:str, serverPort:int) -> Resp
     return response
 
 # Target function that runs when a thread is spawned that handles the requests
-def socket_target(self, conn):
+def socket_target(self, conn, responseFn):
     serializedReq = bytearray()
     while True: 
         data = conn.recv(1024) 
@@ -76,28 +74,41 @@ def socket_target(self, conn):
         serializedReq.extend(data)
     serializedReq = bytes(serializedReq)
     request = deserialize(serializedReq)
-    logging.debug(f"REceived upload req")
-    reqResponse = self.uploadChunk(request)
+    logging.debug(f"Received req")
+    reqResponse = responseFn(request)
     serializedResp = serialize(reqResponse)
     conn.send(serializedResp)
     conn.shutdown(socket.SHUT_WR)
 
 # Sets up the upload handler of the peer and listens to any incoming requests.
-def initUploadThread(self):
-    self.upload_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    self.upload_socket.bind((self.CLIENT_IP,self.CLIENT_PORT))
-    logging.info(f"Started peer, uploading on {(self.CLIENT_IP,self.CLIENT_PORT)}")
-    self.upload_socket.listen(10) #Max 10 peers in the queue
+# responseFn : function to be called when you get a request
+def initListenerThread(self, myIp, myPort, responseFn):
+    self.listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    self.listener_socket.bind((myIp,myPort))
+    logging.info(f"Started peer, uploading on {(myIp,myPort)}")
+    self.listener_socket.listen(10) #Max 10 peers in the queue
     while not self.stopUpload:
         try:
-            client_socket, addr = self.upload_socket.accept()
-            logging.debug(f"Received download req from client: {client_socket}, {addr}")
+            client_socket, addr = self.listener_socket.accept()
+            logging.debug(f"Received req from client: {client_socket}, {addr}")
             uLoadThreads = []
-            uLoadThreads.append(threading.Thread(target = self.socket_target, args = [client_socket]))
+            uLoadThreads.append(threading.Thread(target = self.socket_target, args = [client_socket, responseFn]))
             uLoadThreads[-1].start()
         except:
             break
-    logging.debug("Stopped uploads")
+    logging.debug("Stopped listener")
+
+
+#TODO: create a database class
+class DataStore:
+    def __init__(self):
+        self.data = dict()
+    
+    def put(self, key, value):
+        self.data[key] = value
+    
+    def get(self, key):
+        return self.data.get(key, None)
 
 # Class for vector clock. Has functiosn to add client index, check if dependency is met, update timestamp
 class VectorClock():
