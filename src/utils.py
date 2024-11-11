@@ -36,9 +36,10 @@ def serialize(obj): #Input object, return bytes
 def deserialize(serText): #Input bytes, return object
     return pickle.loads(codecs.decode(serText, "base64"))
 
-class RequestType(Enum):
+class ReqType(Enum):
     READ = 0
     WRITE = 1
+    WRITE_REPLICATE = 2
 
 # Class for request with request type and list of arguments
 class Request():
@@ -56,8 +57,8 @@ class Response():
 #Send request to any server, port over socket
 def sendReqSocket(self, request:Request, serverName:str, serverPort:int) -> Response:
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    logging.debug(f"Connecting to host: {serverName, serverName}")
-    client_socket.connect((serverName,serverName))
+    logging.debug(f"Connecting to host: {serverName, serverPort}")
+    client_socket.connect((serverName,serverPort))
     client_socket.sendall(serialize(request))
     client_socket.shutdown(socket.SHUT_WR)
     response = bytearray()
@@ -70,50 +71,51 @@ def sendReqSocket(self, request:Request, serverName:str, serverPort:int) -> Resp
     return response
 
 # Target function that runs when a thread is spawned that handles the requests
-def socket_target(self, conn, responseFn):
-    serializedReq = bytearray()
-    while True: 
-        data = conn.recv(1024) 
-        if not data: 
-            break
-        serializedReq.extend(data)
-    serializedReq = bytes(serializedReq)
-    request = deserialize(serializedReq)
-    logging.debug(f"Received req")
-    reqResponse = responseFn(request)
-    serializedResp = serialize(reqResponse)
-    conn.send(serializedResp)
-    conn.shutdown(socket.SHUT_WR)
+# def socket_target(self, conn, responseFn):
+#     serializedReq = bytearray()
+#     while True: 
+#         data = conn.recv(1024) 
+#         if not data: 
+#             break
+#         serializedReq.extend(data)
+#     serializedReq = bytes(serializedReq)
+#     request = deserialize(serializedReq)
+#     logging.debug(f"Received req")
+#     reqResponse = responseFn(request)
+#     serializedResp = serialize(reqResponse)
+#     conn.send(serializedResp)
+#     conn.shutdown(socket.SHUT_WR)
 
-# Sets up the upload handler of the peer and listens to any incoming requests.
-# responseFn : function to be called when you get a request
-def initListenerThread(self, myIp, myPort, responseFn):
-    self.listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    self.listener_socket.bind((myIp,myPort))
-    logging.info(f"Started peer, uploading on {(myIp,myPort)}")
-    self.listener_socket.listen(10) #Max 10 peers in the queue
-    while not self.stopUpload:
-        try:
-            client_socket, addr = self.listener_socket.accept()
-            logging.debug(f"Received req from client: {client_socket}, {addr}")
-            uLoadThreads = []
-            uLoadThreads.append(threading.Thread(target = self.socket_target, args = [client_socket, responseFn]))
-            uLoadThreads[-1].start()
-        except:
-            break
-    logging.debug("Stopped listener")
+# # Sets up the upload handler of the peer and listens to any incoming requests.
+# # responseFn : function to be called when you get a request
+# def initListenerThread(self, myIp, myPort, responseFn):
+#     self.listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#     self.listener_socket.bind((myIp,myPort))
+#     logging.info(f"Started peer, uploading on {(myIp,myPort)}")
+#     self.listener_socket.listen(10) #Max 10 peers in the queue
+#     while not self.stopUpload:
+#         try:
+#             client_socket, addr = self.listener_socket.accept()
+#             logging.debug(f"Received req from client: {client_socket}, {addr}")
+#             uLoadThreads = []
+#             uLoadThreads.append(threading.Thread(target = self.socket_target, args = [client_socket, responseFn]))
+#             uLoadThreads[-1].start()
+#         except:
+#             break
+#     logging.debug("Stopped listener")
 
 
-#TODO: create a database class
 class DataStore:
     def __init__(self):
         self.data = dict()
     
-    def put(self, key, value):
-        self.data[key] = value
+    def put(self, key, value, clock):
+        self.data[key] = (value, clock)
     
     def get(self, key):
         return self.data.get(key, None)
+
+DATA_STORE = DataStore()
 
 # Class for vector clock. Has functiosn to add client index, check if dependency is met, update timestamp
 class VectorClock():
