@@ -16,8 +16,9 @@ logging.basicConfig(level=logging.INFO)
 ##################################
 
 # Server info
-SERVER_PORT = 55555
-SERVER_NAME = "130.203.16.40"
+# SERVER_PORT = 55555
+# SERVER_NAME = "130.203.16.40"
+SERVERS = [("130.203.16.40", 55555), ("130.203.16.40", 55556), ("130.203.16.40", 55557)]
 
 # Chunk size
 CHUNK_SIZE = 128
