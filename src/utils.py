@@ -36,6 +36,10 @@ def serialize(obj): #Input object, return bytes
 def deserialize(serText): #Input bytes, return object
     return pickle.loads(codecs.decode(serText, "base64"))
 
+class RequestType(Enum):
+    READ = 0
+    WRITE = 1
+
 # Class for request with request type and list of arguments
 class Request():
     def __init__(self,reqType,clock,args):
