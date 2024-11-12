@@ -1,4 +1,5 @@
 import threading
+import time
 from utils import *
 
 #TODO: each client will contact a primary server for reqs
@@ -12,8 +13,14 @@ class Server:
         self.stopServer = False
         self.SERVER_IP = socket.gethostbyname(socket.gethostname())
         self.SERVER_PORT = port
+        self.OTHER_SERVERS = []
+        for s_ip, s_port in SERVERS:
+            if s_port != self.SERVER_PORT:
+                self.OTHER_SERVERS.append((s_ip, s_port))
         self.serverThread = threading.Thread(target = self.initServer, args = [])
         self.serverThread.start()
+        self.dataStore = DataStore()
+        
 
     # Stops the server by shutting down sockets and waiting for threads to wrap up.
     def stop(self):
@@ -26,24 +33,50 @@ class Server:
     ############################
     
     def readFromDS(self, key):
-        return DATA_STORE.get(key, None)
+        return self.dataStore.get(key, None)
     
-    def writeToDS(self, key, value, clock):
-        DATA_STORE.put(key, value, clock)
-        return ReqStatus.SUCCESS
+    def checkAndWrite(self, key, value, clock, id):
+        while True:
+            prevClock = self.dataStore.get(key)[1]
+            if prevClock.DependencyCheck(clock, id):
+                break
+            else:
+                time.sleep(5)
+        self.dataStore.put(key, value, clock)
+
+    def writeToDS(self, key, value, clock, id):
+        self.checkAndWrite(key, value, clock, id)
+        #send replicate requests to all the other servers 
+        for s_ip, s_port in self.OTHER_SERVERS:
+            replicate_req = Request(ReqType.WRITE_REPLICATE, clock, (key, value, id))
+            response = sendReqSocket(replicate_req, s_ip, s_port)
+            logging.debug(f"Replicate response: status - {response.Status},  clock - {response.Clock}, body - {response.Body}")
+        return Response(ReqStatus.SUCCESS, None, None)
+    
+    def replicateWrite(self, key, value, clock, id):
+        #dependency check and then write
+        self.checkAndWrite(key, value, clock, id)
+        return Response(ReqStatus.SUCCESS, None, None)
 
     # Helper function that maps the request type to the correct API. Returns the result of the operation
     def processRequest(self, request, client_addr):
         #Can be either: Read, Write or Write replicate request
         out = None
+        client_port = int(client_addr[1])
         logging.debug(f"Request: {request.RequestType}")
         if (request.RequestType == ReqType.READ):
             key = request.Args[0]
             out = self.readFromDS(key)
         elif (request.RequestType == ReqType.WRITE):
-            key, 
+            key = request.Args[0]
+            value = request.Args[1]
+            client_clock = request.Clock
+            out = self.writeToDS(key, value, client_clock, client_port)
         elif (request.RequestType == ReqType.WRITE_REPLICATE):
-            pass
+            key = request.Args[0]
+            value = request.Args[1]
+            client_clock = request.Clock
+            out = self.replicateWrite(key, value, client_clock, client_port)
         return out
 
     # Target function that runs when a thread is spawned that handles the requests

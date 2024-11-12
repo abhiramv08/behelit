@@ -134,21 +134,22 @@ class VectorClock():
         if incomingId not in self.clk.keys():
             if otherClk[incomingId] != 1:
                 #buffer
-                pass
-            else:
-                self.AddClient(incomingId)
-                self.clk[incomingId] = 1
+                return False
+            # else:
+            #     self.AddClient(incomingId)
+            #     self.clk[incomingId] = 1
         for id,timestamp in otherClk.items():
             if incomingId != id:
                 if id not in otherClk.keys():
                     # buffer message
-                    break
-                    pass
+                    return False
                 elif self.clk[id] != otherClk[id]:
                     # buffer message
-                    break
-                    pass
-            pass
+                    return False
+            else:
+                if self.clk.get(id, 0) != otherClk[id]-1:
+                    return False
+        return True
     def IncrementClock(self,id):
        self.clk[id] += 1
     def __str__(self):
