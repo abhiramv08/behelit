@@ -116,17 +116,40 @@ class DataStore:
     def get(self, key):
         return self.data.get(key, None)
 
-DATA_STORE = DataStore()
+# DATA_STORE = DataStore()
 
 # Class for vector clock. Has functiosn to add client index, check if dependency is met, update timestamp
 class VectorClock():
     def __init__(self):
         self.clk = dict()
-    def AddClient(self,key):
-        self.clk[key] = 0
-    def DependencyCheck(self,key,msgTimestamp):
-        if self.clk[key]+1 == msgTimestamp:
-            return True
-        return False
-    def UpdateTimestamp(self,key,msgTimestamp):
-        self.clk[key] = msgTimestamp if msgTimestamp>self.clk[key] else self.clk[key]+1 # need to verify
+    def AddClient(self,id):
+        self.clk[id] = 0
+    def UpdateClock(self,otherClk):
+        for id,timestamp in otherClk.items():
+            if id in self.clk.keys():
+                self.clk[id] = max(otherClk[id],self.clk[id])
+            else:
+                self.clk[id] = otherClk[id]
+    def DependencyCheck(self,otherClk,incomingId):
+        if incomingId not in self.clk.keys():
+            if otherClk[incomingId] != 1:
+                #buffer
+                pass
+            else:
+                self.AddClient(incomingId)
+                self.clk[incomingId] = 1
+        for id,timestamp in otherClk.items():
+            if incomingId != id:
+                if id not in otherClk.keys():
+                    # buffer message
+                    break
+                    pass
+                elif self.clk[id] != otherClk[id]:
+                    # buffer message
+                    break
+                    pass
+            pass
+    def IncrementClock(self,id):
+       self.clk[id] += 1
+    def __str__(self):
+       return str(self.clk)
