@@ -50,8 +50,9 @@ class Request():
 
 # Class for response with status and a body
 class Response():
-    def __init__(self,stat,body):
+    def __init__(self,stat,clock,body):
         self.Status = stat
+        self.Clock = clock
         self.Body = body
 
 #Send request to any server, port over socket
