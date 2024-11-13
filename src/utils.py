@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 # Server info
 # SERVER_PORT = 55555
 # SERVER_NAME = "130.203.16.40"
-SERVERS = [("130.203.16.40", 55555), ("130.203.16.40", 55556), ("130.203.16.40", 55557)]
+SERVERS = [("130.203.16.36", 55555), ("130.203.16.36", 55556), ("130.203.16.36", 55557)]
 
 # Chunk size
 CHUNK_SIZE = 128
@@ -56,7 +56,7 @@ class Response():
         self.Body = body
 
 #Send request to any server, port over socket
-def sendReqSocket(self, request:Request, serverName:str, serverPort:int) -> Response:
+def sendReqSocket(request:Request, serverName:str, serverPort:int) -> Response:
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     logging.debug(f"Connecting to host: {serverName, serverPort}")
     client_socket.connect((serverName,serverPort))
@@ -110,11 +110,17 @@ class DataStore:
     def __init__(self):
         self.data = dict()
     
+    def has(self, key):
+        return key in self.data
+
     def put(self, key, value, clock):
         self.data[key] = (value, clock)
     
     def get(self, key):
         return self.data.get(key, None)
+
+    def __str__(self):
+       return str(self.data)
 
 # DATA_STORE = DataStore()
 
@@ -125,12 +131,14 @@ class VectorClock():
     def AddClient(self,id):
         self.clk[id] = 0
     def UpdateClock(self,otherClk):
+        otherClk = otherClk.clk
         for id,timestamp in otherClk.items():
             if id in self.clk.keys():
                 self.clk[id] = max(otherClk[id],self.clk[id])
             else:
                 self.clk[id] = otherClk[id]
     def DependencyCheck(self,otherClk,incomingId):
+        otherClk = otherClk.clk
         if incomingId not in self.clk.keys():
             if otherClk[incomingId] != 1:
                 #buffer
@@ -140,7 +148,7 @@ class VectorClock():
             #     self.clk[incomingId] = 1
         for id,timestamp in otherClk.items():
             if incomingId != id:
-                if id not in otherClk.keys():
+                if id not in self.clk.keys():
                     # buffer message
                     return False
                 elif self.clk[id] != otherClk[id]:
