@@ -16,6 +16,6 @@ server’s thread waits until some other thread receives this message.
 The program is divided into client, server and util files. Common functionalities like socket programming code, vector clock handling, dependency checking are done in the util file. Client exposes write() and read() APIs. Server handles the incoming network request and writes/reads its own data base and may replicate the message. The server supports multithreading, so it doesn’t block a client. Bytes over the socket are deserialized to requests and responses. 
 
 ## Run Steps
-For the demo, we just change directory to test, and run the python file, test.py
-cd ./test
+For the demo, we just change directory to test, and run the python file, test.py  
+cd ./test  
 python test.py
